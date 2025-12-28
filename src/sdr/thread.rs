@@ -42,6 +42,16 @@ pub fn start_sdr_thread(
                         state.write().sdr.frequency = freq;
                         log::info!("Frequency changed to {} Hz", freq);
                     }
+                    Command::IncreaseFrequency(delta) => {
+                        let mut state_guard = state.write();
+                        state_guard.sdr.frequency = state_guard.sdr.frequency.saturating_add(delta as u32);
+                        log::info!("Frequency increased to {} Hz", state_guard.sdr.frequency);
+                    }
+                    Command::DecreaseFrequency(delta) => {
+                        let mut state_guard = state.write();
+                        state_guard.sdr.frequency = state_guard.sdr.frequency.saturating_sub(delta as u32);
+                        log::info!("Frequency decreased to {} Hz", state_guard.sdr.frequency);
+                    }
                     Command::SetSampleRate(rate) => {
                         state.write().sdr.sample_rate = rate;
                         log::info!("Sample rate changed to {} Hz", rate);
@@ -72,20 +82,45 @@ pub fn start_sdr_thread(
 
             // Generate simulated IQ samples
             // TODO: Replace with actual RTL-SDR device reads
+            let current_freq = state.read().sdr.frequency;
             let sample_rate = state.read().sdr.sample_rate;
-            let freq1 = 100_000.0 + (frame_count as f32 * 1000.0).sin() * 50_000.0;
-            let freq2 = -150_000.0 + (frame_count as f32 * 500.0).cos() * 30_000.0;
-            let freq3 = 50_000.0;
 
-            let samples = FftProcessor::generate_test_signal(
-                16384,
-                sample_rate,
-                &[
-                    (freq1, 0.8),
-                    (freq2, 0.6),
-                    (freq3, 0.4),
-                ],
-            );
+            // Simulate some "stations" at specific frequencies
+            // Signals will only appear when tuned near these frequencies
+            let stations = [
+                (100_000_000, 200_000.0, 0.7),  // FM station at 100 MHz, 200 kHz offset
+                (144_390_000, 0.0, 0.9),        // APRS at 144.390 MHz (strong, centered)
+                (144_390_000, 25_000.0, 0.3),   // Weak signal near APRS
+                (162_550_000, 0.0, 0.8),        // NOAA Weather at 162.550 MHz
+                (433_000_000, -100_000.0, 0.6), // 433 MHz signal
+                (1_090_000_000, 0.0, 0.7),      // ADS-B at 1090 MHz
+            ];
+
+            // Build signal list based on current frequency
+            let mut signals = Vec::new();
+            for (station_freq, offset, strength) in &stations {
+                // Calculate how far this station is from our tuned frequency
+                let freq_diff = (*station_freq as i64) - (current_freq as i64);
+                let bandwidth = (sample_rate / 2) as i64;
+
+                // Only include signals within our visible bandwidth
+                if freq_diff.abs() < bandwidth {
+                    // Signal offset relative to our tuned frequency
+                    let signal_offset = freq_diff as f32 + offset;
+                    signals.push((signal_offset, *strength));
+                }
+            }
+
+            // Add a slowly moving signal for demonstration
+            let demo_offset = (frame_count as f32 * 0.01).sin() * 100_000.0;
+            signals.push((demo_offset, 0.5));
+
+            let samples = if signals.is_empty() {
+                // No signals, generate just noise
+                FftProcessor::generate_test_signal(16384, sample_rate, &[(0.0, 0.05)])
+            } else {
+                FftProcessor::generate_test_signal(16384, sample_rate, &signals)
+            };
 
             // Send samples to DSP thread (non-blocking)
             if samples_tx.try_send(samples).is_err() {
