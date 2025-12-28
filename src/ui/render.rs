@@ -46,11 +46,11 @@ pub fn render(terminal: &mut Tui, app: &App) -> Result<()> {
         // Render status bar
         render_status_bar(f, app, chunks[0]);
 
-        // Render spectrum placeholder
-        render_spectrum_placeholder(f, chunks[1]);
+        // Render spectrum
+        render_spectrum_placeholder(f, app, chunks[1]);
 
-        // Render waterfall placeholder
-        render_waterfall_placeholder(f, chunks[2]);
+        // Render waterfall
+        render_waterfall_placeholder(f, app, chunks[2]);
 
         // Split bottom area into controls and decoder output
         let bottom_chunks = Layout::default()
@@ -113,30 +113,58 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(paragraph, area);
 }
 
-/// Render spectrum placeholder
-fn render_spectrum_placeholder(f: &mut Frame, area: Rect) {
+/// Render spectrum analyzer
+fn render_spectrum_placeholder(f: &mut Frame, app: &App, area: Rect) {
+    let state = app.state.read();
+    let freq = state.sdr.frequency;
+    let sample_rate = state.sdr.sample_rate;
+
     let block = Block::default()
         .title("Spectrum Analyzer")
         .borders(Borders::ALL);
 
-    let text = Paragraph::new("Spectrum display (FFT) will appear here")
-        .block(block)
-        .style(Style::default().fg(Color::DarkGray));
+    // Get FFT data from state
+    let fft_data = &state.spectrum.fft_data;
 
-    f.render_widget(text, area);
+    if fft_data.is_empty() {
+        // Show placeholder if no data
+        let text = Paragraph::new("Waiting for signal data...")
+            .block(block)
+            .style(Style::default().fg(Color::DarkGray));
+        f.render_widget(text, area);
+    } else {
+        // Render actual spectrum
+        let widget = super::widgets::SpectrumWidget::new(fft_data, freq, sample_rate)
+            .block(block)
+            .db_range(-100.0, 0.0);
+        f.render_widget(widget, area);
+    }
 }
 
-/// Render waterfall placeholder
-fn render_waterfall_placeholder(f: &mut Frame, area: Rect) {
+/// Render waterfall display
+fn render_waterfall_placeholder(f: &mut Frame, app: &App, area: Rect) {
+    let state = app.state.read();
+
     let block = Block::default()
         .title("Waterfall Display")
         .borders(Borders::ALL);
 
-    let text = Paragraph::new("Waterfall display will appear here")
-        .block(block)
-        .style(Style::default().fg(Color::DarkGray));
+    // Get waterfall data from state
+    let waterfall_data = state.spectrum.get_waterfall_display();
 
-    f.render_widget(text, area);
+    if waterfall_data.is_empty() {
+        // Show placeholder if no data
+        let text = Paragraph::new("Waiting for signal data...")
+            .block(block)
+            .style(Style::default().fg(Color::DarkGray));
+        f.render_widget(text, area);
+    } else {
+        // Render actual waterfall
+        let widget = super::widgets::WaterfallWidget::new(waterfall_data)
+            .block(block)
+            .db_range(-100.0, 0.0);
+        f.render_widget(widget, area);
+    }
 }
 
 /// Render controls panel
