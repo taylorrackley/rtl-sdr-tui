@@ -81,6 +81,47 @@ fn handle_frequency_keys(app: &mut App, key: KeyEvent) -> Result<()> {
             app.send_command(Command::DecreaseFrequency(1_000_000))?;
             app.set_status("Frequency -1 MHz");
         }
+        // Quick select presets using number keys
+        KeyCode::Char('1') => {
+            app.send_command(Command::SetFrequency(144_390_000))?;
+            app.set_status("Preset: APRS North America (144.390 MHz)");
+        }
+        KeyCode::Char('2') => {
+            app.send_command(Command::SetFrequency(144_800_000))?;
+            app.set_status("Preset: APRS Europe (144.800 MHz)");
+        }
+        KeyCode::Char('3') => {
+            app.send_command(Command::SetFrequency(162_400_000))?;
+            app.set_status("Preset: NOAA Weather 1 (162.400 MHz)");
+        }
+        KeyCode::Char('4') => {
+            app.send_command(Command::SetFrequency(162_425_000))?;
+            app.set_status("Preset: NOAA Weather 2 (162.425 MHz)");
+        }
+        KeyCode::Char('5') => {
+            app.send_command(Command::SetFrequency(162_450_000))?;
+            app.set_status("Preset: NOAA Weather 3 (162.450 MHz)");
+        }
+        KeyCode::Char('6') => {
+            app.send_command(Command::SetFrequency(162_475_000))?;
+            app.set_status("Preset: NOAA Weather 4 (162.475 MHz)");
+        }
+        KeyCode::Char('7') => {
+            app.send_command(Command::SetFrequency(162_500_000))?;
+            app.set_status("Preset: NOAA Weather 5 (162.500 MHz)");
+        }
+        KeyCode::Char('8') => {
+            app.send_command(Command::SetFrequency(162_525_000))?;
+            app.set_status("Preset: NOAA Weather 6 (162.525 MHz)");
+        }
+        KeyCode::Char('9') => {
+            app.send_command(Command::SetFrequency(162_550_000))?;
+            app.set_status("Preset: NOAA Weather 7 (162.550 MHz)");
+        }
+        KeyCode::Char('0') => {
+            app.send_command(Command::SetFrequency(1_090_000_000))?;
+            app.set_status("Preset: ADS-B Aircraft (1090 MHz)");
+        }
         _ => {}
     }
     Ok(())

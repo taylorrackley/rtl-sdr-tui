@@ -17,8 +17,21 @@ use std::sync::Arc;
 use ui::App;
 
 fn main() -> Result<()> {
-    // Initialize logging
-    env_logger::init();
+    // Initialize logging to file to avoid corrupting TUI
+    use std::fs::OpenOptions;
+    use std::io::Write;
+
+    let log_file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("rtl-sdr-tui.log")
+        .expect("Failed to open log file");
+
+    env_logger::Builder::from_default_env()
+        .target(env_logger::Target::Pipe(Box::new(log_file)))
+        .filter_level(log::LevelFilter::Info)
+        .init();
+
     log::info!("RTL-SDR TUI v0.1.0 starting...");
 
     // Run the application

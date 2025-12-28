@@ -211,7 +211,7 @@ fn render_controls(f: &mut Frame, app: &App, area: Rect) {
         ),
         Line::from(""),
         Line::from(vec![
-            Span::styled("Controls: ", Style::default().fg(Color::Gray)),
+            Span::styled("Controls:", Style::default().fg(Color::Gray)),
         ]),
         Line::from(vec![
             Span::styled("Tab", Style::default().fg(Color::Green)),
@@ -222,10 +222,32 @@ fn render_controls(f: &mut Frame, app: &App, area: Rect) {
             Span::raw(" - Adjust value"),
         ]),
         Line::from(vec![
+            Span::styled("1-9,0", Style::default().fg(Color::Green)),
+            Span::raw(" - Freq presets"),
+        ]),
+        Line::from(vec![
             Span::styled("Q", Style::default().fg(Color::Green)),
             Span::raw(" - Quit  "),
             Span::styled("R", Style::default().fg(Color::Green)),
             Span::raw(" - Record"),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Presets:", Style::default().fg(Color::Gray)),
+        ]),
+        Line::from(vec![
+            Span::styled("1", Style::default().fg(Color::Cyan)),
+            Span::raw(" APRS-NA  "),
+            Span::styled("2", Style::default().fg(Color::Cyan)),
+            Span::raw(" APRS-EU"),
+        ]),
+        Line::from(vec![
+            Span::styled("3-9", Style::default().fg(Color::Cyan)),
+            Span::raw(" NOAA 162.4-162.55 MHz"),
+        ]),
+        Line::from(vec![
+            Span::styled("0", Style::default().fg(Color::Cyan)),
+            Span::raw(" ADS-B (1090 MHz)"),
         ]),
     ];
 

@@ -66,35 +66,43 @@ pub fn start_sdr_thread(
                 Ok(command) => {
                     match command {
                         Command::SetFrequency(freq) => {
-                            if let Err(e) = controller.set_center_freq(freq) {
-                                log::error!("Failed to set frequency: {:?}", e);
+                            use crate::sdr::config::constraints;
+                            let clamped_freq = freq.clamp(constraints::MIN_FREQUENCY, constraints::MAX_FREQUENCY);
+                            if let Err(e) = controller.set_center_freq(clamped_freq) {
+                                log::error!("Failed to set frequency to {} Hz: {:?}", clamped_freq, e);
                             } else {
-                                cmd_state.write().sdr.frequency = freq;
-                                log::info!("Frequency changed to {} Hz", freq);
+                                cmd_state.write().sdr.frequency = clamped_freq;
+                                log::info!("Frequency changed to {} Hz ({:.3} MHz)", clamped_freq, clamped_freq as f64 / 1_000_000.0);
                             }
                         }
                         Command::IncreaseFrequency(delta) => {
-                            let mut state_guard = cmd_state.write();
-                            let new_freq = state_guard.sdr.frequency.saturating_add(delta as u32);
+                            use crate::sdr::config::constraints;
+                            let state_guard = cmd_state.write();
+                            let new_freq = state_guard.sdr.frequency
+                                .saturating_add(delta as u32)
+                                .clamp(constraints::MIN_FREQUENCY, constraints::MAX_FREQUENCY);
                             drop(state_guard); // Release lock before device call
 
                             if let Err(e) = controller.set_center_freq(new_freq) {
-                                log::error!("Failed to set frequency: {:?}", e);
+                                log::error!("Failed to set frequency to {} Hz: {:?}", new_freq, e);
                             } else {
                                 cmd_state.write().sdr.frequency = new_freq;
-                                log::info!("Frequency increased to {} Hz", new_freq);
+                                log::info!("Frequency increased to {} Hz ({:.3} MHz)", new_freq, new_freq as f64 / 1_000_000.0);
                             }
                         }
                         Command::DecreaseFrequency(delta) => {
-                            let mut state_guard = cmd_state.write();
-                            let new_freq = state_guard.sdr.frequency.saturating_sub(delta as u32);
+                            use crate::sdr::config::constraints;
+                            let state_guard = cmd_state.write();
+                            let new_freq = state_guard.sdr.frequency
+                                .saturating_sub(delta as u32)
+                                .clamp(constraints::MIN_FREQUENCY, constraints::MAX_FREQUENCY);
                             drop(state_guard); // Release lock before device call
 
                             if let Err(e) = controller.set_center_freq(new_freq) {
-                                log::error!("Failed to set frequency: {:?}", e);
+                                log::error!("Failed to set frequency to {} Hz: {:?}", new_freq, e);
                             } else {
                                 cmd_state.write().sdr.frequency = new_freq;
-                                log::info!("Frequency decreased to {} Hz", new_freq);
+                                log::info!("Frequency decreased to {} Hz ({:.3} MHz)", new_freq, new_freq as f64 / 1_000_000.0);
                             }
                         }
                         Command::SetSampleRate(rate) => {
