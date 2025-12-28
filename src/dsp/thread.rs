@@ -1,7 +1,7 @@
 use super::FftProcessor;
 use crate::state::SharedState;
 use crate::types::DemodMode;
-use crossbeam::channel::Receiver;
+use crossbeam::channel::{Receiver, Sender};
 use num_complex::Complex;
 use ringbuf::traits::Producer;
 use ringbuf::HeapRb;
@@ -14,6 +14,7 @@ pub fn start_dsp_thread<P>(
     state: SharedState,
     samples_rx: Receiver<Vec<Complex<f32>>>,
     mut audio_tx: Option<P>,
+    stream_tx: Option<Sender<Vec<f32>>>,
     shutdown: Arc<AtomicBool>,
 ) -> thread::JoinHandle<()>
 where
@@ -44,45 +45,41 @@ where
                     // 2. Demodulate based on current mode
                     let mode = state.read().decoder.mode;
 
-                    match mode {
+                    // Demodulate to get audio samples
+                    let audio: Option<Vec<f32>> = match mode {
                         DemodMode::FmNarrow | DemodMode::FmWide => {
-                            // FM demodulation
-                            if let Some(audio_producer) = audio_tx.as_mut() {
-                                let audio = demodulate_fm(&samples, mode == DemodMode::FmWide);
-                                send_audio_samples(audio_producer, &audio);
-                            }
+                            Some(demodulate_fm(&samples, mode == DemodMode::FmWide))
                         }
                         DemodMode::Am => {
-                            // AM demodulation
-                            if let Some(audio_producer) = audio_tx.as_mut() {
-                                let audio = demodulate_am(&samples);
-                                send_audio_samples(audio_producer, &audio);
-                            }
+                            Some(demodulate_am(&samples))
                         }
                         DemodMode::Usb => {
-                            // USB (Upper Sideband) demodulation
-                            if let Some(audio_producer) = audio_tx.as_mut() {
-                                let audio = demodulate_ssb(&samples, true);
-                                send_audio_samples(audio_producer, &audio);
-                            }
+                            Some(demodulate_ssb(&samples, true))
                         }
                         DemodMode::Lsb => {
-                            // LSB (Lower Sideband) demodulation
-                            if let Some(audio_producer) = audio_tx.as_mut() {
-                                let audio = demodulate_ssb(&samples, false);
-                                send_audio_samples(audio_producer, &audio);
-                            }
-                        }
-                        DemodMode::Raw => {
-                            // No demodulation, just visualization
+                            Some(demodulate_ssb(&samples, false))
                         }
                         DemodMode::Aprs | DemodMode::Adsb => {
                             // Digital modes - demodulate FM for APRS, raw for ADS-B
                             // TODO: Add packet decoding
-                            if let Some(audio_producer) = audio_tx.as_mut() {
-                                let audio = demodulate_fm(&samples, false);
-                                send_audio_samples(audio_producer, &audio);
-                            }
+                            Some(demodulate_fm(&samples, false))
+                        }
+                        DemodMode::Raw => {
+                            // No demodulation, just visualization
+                            None
+                        }
+                    };
+
+                    // Send audio to local output and/or network stream
+                    if let Some(ref audio_samples) = audio {
+                        // Send to local audio output
+                        if let Some(audio_producer) = audio_tx.as_mut() {
+                            send_audio_samples(audio_producer, audio_samples);
+                        }
+
+                        // Send to network stream
+                        if let Some(ref stream) = stream_tx {
+                            let _ = stream.try_send(audio_samples.clone());
                         }
                     }
                 }

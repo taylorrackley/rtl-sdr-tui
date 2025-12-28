@@ -39,6 +39,7 @@ env_logger = "0.11"
 chrono = "0.4"
 rand = "0.8"
 libc = "0.2"
+clap = { version = "4.4", features = ["derive"] }
 
 [features]
 default = ["audio"]
