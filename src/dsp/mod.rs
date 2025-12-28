@@ -6,4 +6,6 @@ pub mod resampler;
 pub mod thread;
 
 // Re-export commonly used types
-pub use fft::{FftProcessor, normalize_fft};
+pub use fft::{normalize_fft, FftProcessor};
+pub use resampler::Resampler;
+pub use thread::start_dsp_thread;

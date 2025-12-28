@@ -8,12 +8,12 @@ mod types;
 mod ui;
 
 use anyhow::Result;
-use dsp::FftProcessor;
+use audio::AudioOutput;
+use crossbeam::channel;
+use ringbuf::{traits::Split, HeapRb};
 use state::AppState;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::thread;
-use std::time::Duration;
 use ui::App;
 
 fn main() -> Result<()> {
@@ -35,12 +35,46 @@ fn run() -> Result<()> {
     // Initialize shared state
     let state = AppState::new_shared();
 
-    // Start test signal generator thread
+    // Create shutdown signal
     let shutdown = Arc::new(AtomicBool::new(false));
-    let test_thread = start_test_signal_generator(state.clone(), shutdown.clone());
+
+    // Create channel for IQ samples (SDR -> DSP)
+    let (samples_tx, samples_rx) = channel::bounded(64);
+
+    // Create channel for commands (UI -> SDR)
+    let (command_tx, command_rx) = channel::unbounded();
+
+    // Create ring buffer for audio (DSP -> Audio)
+    const AUDIO_BUFFER_SIZE: usize = 48000; // 1 second at 48kHz
+    let audio_ring = HeapRb::<f32>::new(AUDIO_BUFFER_SIZE);
+    let (audio_producer, audio_consumer) = audio_ring.split();
+
+    // Start SDR thread (currently simulated data)
+    log::info!("Starting SDR thread...");
+    let sdr_thread = sdr::start_sdr_thread(
+        0, // device index
+        state.clone(),
+        samples_tx,
+        command_rx,
+        shutdown.clone(),
+    )?;
+
+    // Start DSP processing thread
+    log::info!("Starting DSP thread...");
+    let dsp_thread = dsp::start_dsp_thread(
+        state.clone(),
+        samples_rx,
+        Some(audio_producer),
+        shutdown.clone(),
+    );
+
+    // Initialize audio output
+    log::info!("Starting audio output...");
+    let _audio_output = AudioOutput::new(audio_consumer)?;
 
     // Initialize the UI app
     let mut app = App::new(state);
+    app.set_command_tx(command_tx);
 
     // Initialize terminal
     let mut terminal = ui::init()?;
@@ -62,52 +96,14 @@ fn run() -> Result<()> {
     // Restore terminal
     ui::restore()?;
 
-    // Signal test thread to stop
+    // Signal all threads to stop
+    log::info!("Shutting down threads...");
     shutdown.store(true, Ordering::Relaxed);
-    let _ = test_thread.join();
+
+    // Wait for threads to finish
+    let _ = sdr_thread.join();
+    let _ = dsp_thread.join();
 
     log::info!("RTL-SDR TUI shutting down");
     Ok(())
-}
-
-/// Start a test signal generator thread for demonstration
-fn start_test_signal_generator(
-    state: state::SharedState,
-    shutdown: Arc<AtomicBool>,
-) -> thread::JoinHandle<()> {
-    thread::spawn(move || {
-        let mut fft_processor = FftProcessor::new(2048);
-        let mut frame_count = 0u32;
-
-        while !shutdown.load(Ordering::Relaxed) {
-            // Get current sample rate from state
-            let sample_rate = state.read().sdr.sample_rate;
-
-            // Generate test signal with moving frequencies
-            let freq1 = 100_000.0 + (frame_count as f32 * 1000.0).sin() * 50_000.0;
-            let freq2 = -150_000.0 + (frame_count as f32 * 500.0).cos() * 30_000.0;
-            let freq3 = 50_000.0;
-
-            let test_signal = FftProcessor::generate_test_signal(
-                2048,
-                sample_rate,
-                &[
-                    (freq1, 0.8),
-                    (freq2, 0.6),
-                    (freq3, 0.4),
-                ],
-            );
-
-            // Process with FFT
-            let fft_data = fft_processor.process(&test_signal);
-
-            // Update state
-            state.write().spectrum.add_fft_data(fft_data);
-
-            frame_count = frame_count.wrapping_add(1);
-
-            // Update at ~20 FPS
-            thread::sleep(Duration::from_millis(50));
-        }
-    })
 }
