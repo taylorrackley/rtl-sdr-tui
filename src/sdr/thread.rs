@@ -18,6 +18,10 @@ pub fn start_sdr_thread(
 ) -> Result<thread::JoinHandle<()>> {
     log::info!("Opening RTL-SDR device {}...", device_index);
 
+    // Suppress librtlsdr stderr output to prevent TUI corruption
+    // The RTL-SDR library prints tuner errors directly to stderr which we cannot control
+    suppress_stderr();
+
     // Open RTL-SDR device
     let (mut controller, mut reader) = rtlsdr_mt::open(device_index as u32)
         .map_err(|e| anyhow::anyhow!("Failed to open RTL-SDR device {}: {:?}", device_index, e))?;
@@ -197,4 +201,29 @@ pub fn start_sdr_thread(
     });
 
     Ok(handle)
+}
+
+/// Suppress stderr to prevent librtlsdr from corrupting the TUI
+/// The RTL-SDR C library prints tuner errors directly to stderr which we cannot intercept
+#[cfg(unix)]
+fn suppress_stderr() {
+    use std::os::unix::io::AsRawFd;
+
+    unsafe {
+        // Open /dev/null
+        let null_path = std::ffi::CString::new("/dev/null").unwrap();
+        let null_fd = libc::open(null_path.as_ptr(), libc::O_WRONLY);
+
+        if null_fd >= 0 {
+            // Redirect stderr (fd 2) to /dev/null
+            libc::dup2(null_fd, libc::STDERR_FILENO);
+            libc::close(null_fd);
+        }
+    }
+}
+
+#[cfg(not(unix))]
+fn suppress_stderr() {
+    // On non-Unix systems, we can't easily suppress stderr
+    // The TUI corruption will remain on Windows
 }

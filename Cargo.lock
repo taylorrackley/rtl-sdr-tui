@@ -1836,6 +1836,7 @@ dependencies = [
  "crossterm 0.28.1",
  "dasp",
  "env_logger",
+ "libc",
  "log",
  "num-complex",
  "parking_lot",
