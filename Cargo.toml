@@ -1,0 +1,43 @@
+[package]
+name = "rtl-sdr-tui"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# TUI Framework
+ratatui = "0.30"
+crossterm = "0.28"
+
+# RTL-SDR Interface
+rtlsdr_mt = "2.2"
+
+# DSP and Signal Processing
+rustfft = "6.2"
+dasp = { version = "0.11", features = ["signal", "interpolate", "ring_buffer"] }
+num-complex = "0.4"
+
+# Audio Output (optional - requires libasound2-dev on Linux)
+cpal = { version = "0.15", optional = true }
+ringbuf = "0.4"
+
+# Digital Decoders
+adsb_deku = "0.7"
+aprs-parser = "0.4"
+
+# Threading and Concurrency
+crossbeam = "0.8"
+parking_lot = "0.12"
+
+# File I/O and Recording
+byteorder = "1.5"
+
+# Utilities
+anyhow = "1.0"
+thiserror = "1.0"
+log = "0.4"
+env_logger = "0.11"
+chrono = "0.4"
+
+[features]
+default = ["audio"]
+audio = ["cpal"]
